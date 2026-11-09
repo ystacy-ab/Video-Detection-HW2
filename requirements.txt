@@ -1,0 +1,23 @@
+# torch / torchvision come preinstalled on Kaggle & Colab (CUDA builds).
+# Only lower bounds here so pip does NOT reinstall torch on the GPU image.
+torch>=2.1
+torchvision>=0.16          # needs fasterrcnn_resnet50_fpn_v2 (>=0.13)
+
+# Detection frameworks / tools (these are the versions that matter)
+ultralytics>=8.3.0,<9      # YOLO11 + RT-DETR
+faster-coco-eval>=1.6      # fast COCO mAP (pycocotools-compatible)
+pycocotools>=2.0.7         # fallback evaluator
+ensemble-boxes==1.0.9      # Weighted Boxes Fusion
+sahi>=0.11                 # sliced inference (Stage F)
+
+# General
+numpy
+pandas
+matplotlib
+opencv-python-headless
+Pillow
+PyYAML
+scikit-learn               # GroupKFold by clip
+tqdm
+certifi                    # CA bundle for weight downloads (macOS python.org builds lack one)
+wandb                      # optional, enabled via config flag

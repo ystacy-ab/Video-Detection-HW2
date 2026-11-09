@@ -1,0 +1,1 @@
+timestamp,experiment,model,params,val_mAP,AP50,AP75,AP_small,AP_medium,AP_large,ms_per_img,FPS,train_time_min,public_lb,notes

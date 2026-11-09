@@ -1,0 +1,55 @@
+# Faster R-CNN baseline = torchvision defaults (anchors, input size, samplers), COCO weights.
+# Inherits configs/base.yaml (seed, eval, submission, wandb). Variants inherit this file.
+_base_: base.yaml
+experiment: frcnn_baseline
+
+model:
+  arch: fasterrcnn_resnet50_fpn_v2
+  weights: DEFAULT                 # COCO_V1 weights; the 91-class predictor is replaced by 8+1 classes
+  trainable_backbone_layers: 3     # torchvision default when fine-tuning (conv1 + layer1 frozen)
+  anchor_sizes: [32, 64, 128, 256, 512]   # one size per FPN level P2..P6 (torchvision default)
+  aspect_ratios: [0.5, 1.0, 2.0]          # h / w, shared by all levels -> 3 anchors / location
+  min_size_train: [800]            # short side; several values = random scale jitter per image
+  min_size_test: 800
+  max_size: 1333                   # long-side cap
+  rpn_pre_nms_top_n_train: 2000    # per FPN level
+  rpn_pre_nms_top_n_test: 1000
+  rpn_post_nms_top_n_train: 2000   # proposals per image after NMS
+  rpn_post_nms_top_n_test: 1000
+  rpn_batch_size_per_image: 256    # sampled anchors per image for the RPN loss
+  rpn_positive_fraction: 0.5
+  box_batch_size_per_image: 512    # sampled RoIs per image for the box-head loss
+  box_positive_fraction: 0.25
+  box_nms_thresh: 0.5              # class-wise NMS in post-processing
+  box_score_thresh: 0.001          # keep low-score boxes: mAP needs the full recall range
+  box_detections_per_img: 500      # = competition maxDets
+  box_loss: smooth_l1              # smooth_l1 | giou
+  giou_weight: 10.0
+
+ignore:
+  mode: mask_loss                  # mask_loss | paint | none   (see src/dataset.py)
+  ioa_thresh: 0.5                  # negative anchor / RoI with IoA > 0.5 inside an ignore box -> not sampled
+
+data:
+  train_frame_step: 6              # every 6th frame (~4.0k frames): T4 budget; base.yaml uses 3 for YOLO
+  val_frame_step_epoch: 4          # per-epoch val mAP on every 4th val frame (~710 frames)
+  hflip: 0.5
+
+train:
+  epochs: 6
+  batch_size: 2
+  accum_steps: 2                   # effective batch 4
+  num_workers: 4
+  optimizer: sgd                   # sgd | adamw
+  lr: 0.01                         # for effective batch 4 (fine-tuning from COCO)
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  schedule: cosine                 # cosine | step | onecycle
+  warmup_iters: 300                # optimizer steps
+  min_lr_ratio: 0.05
+  grad_clip: 10.0
+  amp: true
+  freeze_bn: true                  # BN running stats frozen (batch 2 is too small)
+  val_every: 1
+  log_every: 50
+  max_iters_per_epoch: null        # set an int to cap epoch length (debugging)

@@ -1,0 +1,13 @@
+# Variant 1: anchors for small objects + higher input resolution with scale jitter.
+# Why (results/eda_stats.json): median object size 46 px, p5 = 20 px, 25 % of train boxes are COCO-small,
+# k-means(k=9) sizes 17..138 px. With the baseline 800/1333 input a 1904x1071 frame is shrunk x0.70 and
+# a 2688x1512 frame x0.50, so most objects are below the smallest default anchor (32 px at stride 4).
+_base_: frcnn_baseline.yaml
+experiment: frcnn_small_anchors
+
+model:
+  anchor_sizes: [16, 32, 64, 128, 256]    # still 3 anchors / location -> pretrained RPN head is kept
+  min_size_train: [896, 960, 1024, 1088]  # scale jitter
+  min_size_test: 1024
+  max_size: 1824                          # 1904x1071 frames are used almost at native size
+  rpn_post_nms_top_n_test: 2000           # up to 180 objects / frame and 500 detections are scored

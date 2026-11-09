@@ -1,0 +1,26 @@
+# Shared settings for ALL experiments (paths are set at the top of each notebook).
+seed: 42
+num_classes: 8
+class_names: [person, bicycle, car, van, truck, tricycle, bus, motor]
+
+data:
+  train_frame_step: 3      # keep every 3rd frame of each training clip (ablation: 1 vs 3)
+  val_frame_step: 1        # official validation always uses every frame
+  ignore_fill: 114         # gray value painted over ignore regions (Ultralytics letterbox color)
+  ignore_drop_ioa: 0.5     # drop GT boxes covered > 50% by ignore regions
+  link_unmasked: true      # symlink frames without ignore regions instead of copying
+
+eval:
+  max_dets: 500            # competition scores at most 500 detections / image
+  speed_warmup: 10         # warm-up iterations before timing
+  speed_iters: 100         # timed iterations
+
+submission:
+  conf_thres: 0.001        # low threshold so recall is not lost
+  max_det: 500
+  decimals: 1              # rounding of box coordinates in the CSV
+
+wandb:
+  enabled: false           # set true (and `wandb login`) to log runs
+  project: visdrone-vid-hw2
+  entity: null

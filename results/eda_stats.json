@@ -1,0 +1,332 @@
+{
+ "resolutions": {
+  "680x382": {
+   "test": 3,
+   "train": 0,
+   "val": 0
+  },
+  "960x540": {
+   "test": 5,
+   "train": 0,
+   "val": 0
+  },
+  "1344x756": {
+   "test": 7,
+   "train": 11,
+   "val": 2
+  },
+  "1360x764": {
+   "test": 18,
+   "train": 0,
+   "val": 0
+  },
+  "1360x765": {
+   "test": 0,
+   "train": 1,
+   "val": 0
+  },
+  "1904x1071": {
+   "test": 0,
+   "train": 30,
+   "val": 2
+  },
+  "1904x1072": {
+   "test": 4,
+   "train": 0,
+   "val": 0
+  },
+  "1920x1080": {
+   "test": 11,
+   "train": 1,
+   "val": 0
+  },
+  "2688x1512": {
+   "test": 0,
+   "train": 11,
+   "val": 1
+  },
+  "2720x1530": {
+   "test": 0,
+   "train": 2,
+   "val": 1
+  },
+  "3840x2160": {
+   "test": 0,
+   "train": 0,
+   "val": 1
+  }
+ },
+ "class_counts": {
+  "train": {
+   "person": 328701,
+   "bicycle": 40255,
+   "car": 505301,
+   "van": 46940,
+   "truck": 30498,
+   "tricycle": 41349,
+   "bus": 9653,
+   "motor": 102819
+  },
+  "val": {
+   "person": 50312,
+   "bicycle": 6022,
+   "car": 31821,
+   "van": 6842,
+   "truck": 1359,
+   "tricycle": 5487,
+   "bus": 264,
+   "motor": 12025
+  }
+ },
+ "size_buckets": {
+  "train": {
+   "medium": 0.635,
+   "small": 0.249,
+   "large": 0.116
+  },
+  "val": {
+   "medium": 0.695,
+   "small": 0.192,
+   "large": 0.113
+  }
+ },
+ "size_percentiles_train": {
+  "0.05": 19.7,
+  "0.25": 32.0,
+  "0.5": 45.8,
+  "0.75": 67.9,
+  "0.95": 130.2
+ },
+ "per_class_size": {
+  "median_size": {
+   "person": 35.78,
+   "bicycle": 41.41,
+   "car": 57.01,
+   "van": 49.85,
+   "truck": 73.46,
+   "tricycle": 54.85,
+   "bus": 113.45,
+   "motor": 40.21
+  },
+  "p10_size": {
+   "person": 19.8,
+   "bicycle": 24.9,
+   "car": 28.27,
+   "van": 28.14,
+   "truck": 32.73,
+   "tricycle": 24.25,
+   "bus": 41.83,
+   "motor": 20.2
+  },
+  "median_h_over_w": {
+   "person": 2.0,
+   "bicycle": 1.06,
+   "car": 0.8,
+   "van": 0.9,
+   "truck": 0.93,
+   "tricycle": 0.94,
+   "bus": 0.97,
+   "motor": 1.24
+  },
+  "small_%": {
+   "person": 39.5,
+   "bicycle": 24.4,
+   "car": 16.3,
+   "van": 21.4,
+   "truck": 9.4,
+   "tricycle": 21.0,
+   "bus": 4.1,
+   "motor": 30.4
+  }
+ },
+ "objects_per_frame": {
+  "train": {
+   "mean": 45.7,
+   "p95": 118,
+   "p99": 142,
+   "max": 180,
+   "frames_over_300": 0,
+   "frames_over_500": 0
+  },
+  "val": {
+   "mean": 40.1,
+   "p95": 103,
+   "p99": 112,
+   "max": 116,
+   "frames_over_300": 0,
+   "frames_over_500": 0
+  }
+ },
+ "occlusion_share_by_class": {
+  "0.0": {
+   "person": 0.541,
+   "bicycle": 0.465,
+   "car": 0.57,
+   "van": 0.571,
+   "truck": 0.353,
+   "tricycle": 0.409,
+   "bus": 0.559,
+   "motor": 0.547
+  },
+  "1.0": {
+   "person": 0.396,
+   "bicycle": 0.501,
+   "car": 0.384,
+   "van": 0.404,
+   "truck": 0.489,
+   "tricycle": 0.57,
+   "bus": 0.42,
+   "motor": 0.39
+  },
+  "2.0": {
+   "person": 0.063,
+   "bicycle": 0.034,
+   "car": 0.046,
+   "van": 0.025,
+   "truck": 0.158,
+   "tricycle": 0.021,
+   "bus": 0.021,
+   "motor": 0.063
+  }
+ },
+ "truncation_share_by_class": {
+  "0.0": {
+   "person": 0.98,
+   "bicycle": 0.992,
+   "car": 0.943,
+   "van": 0.958,
+   "truck": 0.888,
+   "tricycle": 0.954,
+   "bus": 0.862,
+   "motor": 0.969
+  },
+  "1.0": {
+   "person": 0.02,
+   "bicycle": 0.008,
+   "car": 0.057,
+   "van": 0.042,
+   "truck": 0.112,
+   "tricycle": 0.046,
+   "bus": 0.138,
+   "motor": 0.031
+  }
+ },
+ "ignore": {
+  "train": {
+   "frames_with_ignore_%": 74.7,
+   "regions_per_frame_mean": 21.1,
+   "covered_area_%_mean_when_present": 23.64,
+   "covered_area_%_max": 100.0
+  },
+  "val": {
+   "frames_with_ignore_%": 50.4,
+   "regions_per_frame_mean": 11.23,
+   "covered_area_%_mean_when_present": 25.65,
+   "covered_area_%_max": 88.56
+  }
+ },
+ "kmeans_anchors": {
+  "5": {
+   "wh": [
+    [
+     20.0,
+     29.0
+    ],
+    [
+     49.0,
+     35.0
+    ],
+    [
+     31.0,
+     57.0
+    ],
+    [
+     76.0,
+     65.0
+    ],
+    [
+     155.0,
+     107.0
+    ]
+   ],
+   "sizes": [
+    24.1,
+    41.4,
+    42.0,
+    70.3,
+    128.8
+   ],
+   "ratios_h_over_w": [
+    1.45,
+    0.71,
+    1.84,
+    0.86,
+    0.69
+   ],
+   "mean_iou": 0.656
+  },
+  "9": {
+   "wh": [
+    [
+     14.0,
+     20.0
+    ],
+    [
+     17.0,
+     36.0
+    ],
+    [
+     31.0,
+     29.0
+    ],
+    [
+     25.0,
+     52.0
+    ],
+    [
+     44.0,
+     46.0
+    ],
+    [
+     66.0,
+     34.0
+    ],
+    [
+     47.0,
+     76.0
+    ],
+    [
+     93.0,
+     61.0
+    ],
+    [
+     162.0,
+     118.0
+    ]
+   ],
+   "sizes": [
+    16.7,
+    24.7,
+    30.0,
+    36.1,
+    45.0,
+    47.4,
+    59.8,
+    75.3,
+    138.3
+   ],
+   "ratios_h_over_w": [
+    1.43,
+    2.12,
+    0.94,
+    2.08,
+    1.05,
+    0.52,
+    1.62,
+    0.66,
+    0.73
+   ],
+   "mean_iou": 0.725
+  }
+ }
+}

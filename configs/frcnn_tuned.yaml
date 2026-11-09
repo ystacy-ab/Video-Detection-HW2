@@ -1,0 +1,14 @@
+# Variant 2: variant 1 + sampler settings for dense scenes + GIoU box loss.
+# - more positives per image: frames have 46 objects on average (up to 180), the default 25 % positive
+#   RoIs and 256 RPN anchors under-sample them.
+# - GIoU loss (Rezatofighi et al., CVPR 2019) optimises the overlap directly -> helps AP75 / mAP@[.5:.95].
+_base_: frcnn_small_anchors.yaml
+experiment: frcnn_tuned
+
+model:
+  rpn_batch_size_per_image: 512
+  rpn_pre_nms_top_n_test: 2000
+  box_batch_size_per_image: 512
+  box_positive_fraction: 0.5
+  box_loss: giou
+  giou_weight: 10.0

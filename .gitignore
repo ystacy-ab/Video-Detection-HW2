@@ -1,0 +1,16 @@
+# Large / generated artifacts (keep them in WORK_DIR, not in git)
+work/
+runs/
+wandb/
+datasets/
+*.pt
+*.pth
+*.pkl
+*.cache
+__pycache__/
+.ipynb_checkpoints/
+
+# Local copy of the competition data
+data/
+outputs/
+.venv/
