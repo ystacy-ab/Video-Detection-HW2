@@ -1,0 +1,8 @@
+# Ablation 1 (loss modification): baseline + GIoU box-regression loss in the second stage.
+# GIoU (Rezatofighi et al., CVPR 2019) optimises the overlap directly -> expected to help AP75 / mAP@[.5:.95].
+_base_: frcnn_baseline.yaml
+experiment: frcnn_giou
+
+model:
+  box_loss: giou
+  giou_weight: 10.0      # as in mmdetection faster-rcnn_r50_fpn_giou_1x_coco.py

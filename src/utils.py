@@ -94,14 +94,13 @@ def seed_everything(seed: int = 42) -> None:
 
 def detect_env() -> str:
     """Return 'kaggle', 'colab' or 'local'."""
-    if os.environ.get("KAGGLE_KERNEL_RUN_TYPE") or Path("/kaggle/working").exists():
-        return "kaggle"
-    try:
+    try:  # check Colab first: Colab also has /kaggle/... folders (Kaggle integration)
         import google.colab  # noqa: F401
 
         return "colab"
     except ImportError:
-        return "local"
+        pass
+    return "kaggle" if os.environ.get("KAGGLE_KERNEL_RUN_TYPE") else "local"
 
 
 def print_versions() -> None:

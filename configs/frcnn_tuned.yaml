@@ -1,14 +1,17 @@
-# Variant 2: variant 1 + sampler settings for dense scenes + GIoU box loss.
-# - more positives per image: frames have 46 objects on average (up to 180), the default 25 % positive
-#   RoIs and 256 RPN anchors under-sample them.
-# - GIoU loss (Rezatofighi et al., CVPR 2019) optimises the overlap directly -> helps AP75 / mAP@[.5:.95].
-_base_: frcnn_small_anchors.yaml
+# Final two-stage model: small anchors + higher input resolution + both ablations above.
+# Why (results/eda_stats.json): median object 46 px, p5 = 20 px; at 800/1333 a 1904x1071 frame shrinks x0.70,
+# so most objects fall below the smallest default anchor (32 px). At 1024/1824 the scale is ~0.96 and the
+# k-means sizes (16..138 px) are covered by anchors 16..256 (see the anchor-coverage cell in 02).
+_base_: frcnn_baseline.yaml
 experiment: frcnn_tuned
 
 model:
-  rpn_batch_size_per_image: 512
-  rpn_pre_nms_top_n_test: 2000
-  box_batch_size_per_image: 512
-  box_positive_fraction: 0.5
+  anchor_sizes: [16, 32, 64, 128, 256]
+  min_size_train: [896, 960, 1024, 1088]   # scale jitter
+  min_size_test: 1024
+  max_size: 1824
   box_loss: giou
-  giou_weight: 10.0
+  rpn_pre_nms_top_n_test: 2000
+  rpn_post_nms_top_n_test: 2000
+  rpn_batch_size_per_image: 512
+  box_positive_fraction: 0.5

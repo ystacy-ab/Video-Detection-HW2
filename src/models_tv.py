@@ -1,10 +1,12 @@
-"""torchvision detectors: Faster R-CNN (this stage), shared helpers reused by RetinaNet later.
+"""torchvision detectors: Faster R-CNN (two-stage) and RetinaNet (one-stage), both anchor-based.
 
 Faster R-CNN: Ren et al., "Faster R-CNN: Towards Real-Time Object Detection with Region Proposal
 Networks", NeurIPS 2015. FPN: Lin et al., "Feature Pyramid Networks for Object Detection", CVPR 2017.
 "v2" weights/architecture: Li et al., "Benchmarking Detection Transfer Learning with Vision
 Transformers" (2021) as implemented in torchvision (`fasterrcnn_resnet50_fpn_v2`).
 GIoU loss: Rezatofighi et al., "Generalized Intersection over Union", CVPR 2019.
+RetinaNet / focal loss: Lin et al., "Focal Loss for Dense Object Detection", ICCV 2017
+(torchvision `retinanet_resnet50_fpn_v2`: GroupNorm heads + GIoU box loss).
 
 Model config keys (section `model:` in configs/frcnn_*.yaml) are documented in
 configs/frcnn_baseline.yaml.
@@ -12,6 +14,7 @@ configs/frcnn_baseline.yaml.
 from __future__ import annotations
 
 import math
+from functools import partial as _partial
 from functools import partial
 
 import numpy as np
@@ -21,9 +24,11 @@ import torchvision
 from torchvision.models.detection import roi_heads as _roi_mod
 from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models.detection.retinanet import (RetinaNet, RetinaNetClassificationHead,
+                                                    RetinaNetRegressionHead)
 from torchvision.models.detection.roi_heads import RoIHeads
 from torchvision.models.detection.rpn import RegionProposalNetwork, RPNHead
-from torchvision.ops import box_iou, generalized_box_iou_loss
+from torchvision.ops import box_iou, generalized_box_iou_loss, sigmoid_focal_loss
 
 from .utils import NUM_CLASSES
 
@@ -215,6 +220,88 @@ def build_faster_rcnn(mcfg: dict, ignore_ioa: float = 0.5):
     return model
 
 
+class IgnoreAwareRetinaNet(RetinaNet):
+    """RetinaNet whose background anchors inside ignore regions are excluded from the focal loss.
+
+    Same assignment as torchvision (IoU >= fg -> positive, < bg -> negative, in between -> ignored),
+    plus: negative anchors with IoA > ignore_ioa_thresh inside an ignore box -> ignored (-2).
+    """
+
+    ignore_ioa_thresh = 0.5
+
+    def compute_loss(self, targets, head_outputs, anchors):
+        targets, ignore = split_ignore(targets)
+        below, between = self.proposal_matcher.BELOW_LOW_THRESHOLD, self.proposal_matcher.BETWEEN_THRESHOLDS
+        matched_idxs = []
+        for anc, t, ign in zip(anchors, targets, ignore):
+            if t["boxes"].numel() == 0:
+                m = torch.full((anc.size(0),), below, dtype=torch.int64, device=anc.device)
+            else:
+                m = self.proposal_matcher(box_iou(t["boxes"], anc))
+            if len(ign):
+                m[(m == below) & (max_ioa(anc, ign) > self.ignore_ioa_thresh)] = between
+            matched_idxs.append(m)
+        return self.head.compute_loss(targets, head_outputs, anchors, matched_idxs)
+
+
+class FocalClassificationHead(RetinaNetClassificationHead):
+    """torchvision classification head with configurable focal-loss alpha / gamma (defaults 0.25 / 2)."""
+
+    focal_alpha = 0.25
+    focal_gamma = 2.0
+
+    def compute_loss(self, targets, head_outputs, matched_idxs):
+        losses = []
+        for t, logits, m in zip(targets, head_outputs["cls_logits"], matched_idxs):
+            fg = m >= 0
+            target = torch.zeros_like(logits)
+            target[fg, t["labels"][m[fg]]] = 1.0
+            valid = m != self.BETWEEN_THRESHOLDS
+            loss = sigmoid_focal_loss(logits[valid], target[valid], alpha=self.focal_alpha,
+                                      gamma=self.focal_gamma, reduction="sum")
+            losses.append(loss / max(1, int(fg.sum())))
+        return sum(losses) / len(targets)
+
+
+def build_retinanet(mcfg: dict, ignore_ioa: float = 0.5):
+    """retinanet_resnet50_fpn_v2 with COCO weights, new classification head (8 classes + unused 0).
+
+    Anchors: per FPN level P3..P7 one base size x anchor_scales (octaves) x aspect_ratios.
+    Keeping 3 scales x 3 ratios = 9 anchors / location keeps the pretrained box-regression head.
+    """
+    use_certifi_ca()
+    weights = mcfg.get("weights", "DEFAULT")
+    model = torchvision.models.detection.retinanet_resnet50_fpn_v2(
+        weights=weights, weights_backbone=None if weights else "DEFAULT",
+        trainable_backbone_layers=mcfg.get("trainable_backbone_layers", 3),
+        min_size=tuple(mcfg["min_size_train"]), max_size=mcfg["max_size"],
+        score_thresh=mcfg["box_score_thresh"], nms_thresh=mcfg["box_nms_thresh"],
+        detections_per_img=mcfg["box_detections_per_img"], topk_candidates=mcfg.get("topk_candidates", 1000),
+        fg_iou_thresh=mcfg["fg_iou_thresh"], bg_iou_thresh=mcfg["bg_iou_thresh"])
+
+    sizes = [tuple(int(round(b * k)) for k in mcfg["anchor_scales"]) for b in mcfg["anchor_sizes"]]
+    ag = make_anchor_generator(sizes, mcfg["aspect_ratios"])
+    model.anchor_generator = ag
+    n_anchors = ag.num_anchors_per_location()[0]
+    gn = _partial(torch.nn.GroupNorm, 32)
+    if n_anchors != model.head.regression_head.bbox_reg.out_channels // 4:  # pretrained head: 9 anchors
+        print(f"[model] {n_anchors} anchors/location -> new (randomly initialised) box-regression head")
+        reg = RetinaNetRegressionHead(model.backbone.out_channels, n_anchors, norm_layer=gn)
+        reg._loss_type = "giou"
+        model.head.regression_head = reg
+    cls_head = FocalClassificationHead(model.backbone.out_channels, n_anchors, NUM_CLASSES + 1, norm_layer=gn)
+    cls_head.focal_alpha, cls_head.focal_gamma = mcfg.get("focal_alpha", 0.25), mcfg.get("focal_gamma", 2.0)
+    model.head.classification_head = cls_head
+
+    model.__class__ = IgnoreAwareRetinaNet
+    model.ignore_ioa_thresh = ignore_ioa
+    model.supports_ignore = True
+    n_params = sum(p.numel() for p in model.parameters()) / 1e6
+    print(f"[model] retinanet_resnet50_fpn_v2 | params {n_params:.1f}M | anchors {sizes} x {mcfg['aspect_ratios']} | "
+          f"IoU fg/bg {mcfg['fg_iou_thresh']}/{mcfg['bg_iou_thresh']} | focal a={cls_head.focal_alpha} g={cls_head.focal_gamma}")
+    return model
+
+
 def set_input_size(model, sizes) -> None:
     """Short-side sizes of the model transform: tuple = random choice per image in train mode
     (scale jitter), the LAST value is used in eval mode (torchvision GeneralizedRCNNTransform)."""
@@ -276,3 +363,43 @@ def rpn_recall(model, index, gt: dict, test_size: int, device, n_images: int = 1
             out.append({"top_n": n, "iou": t, "bucket": b, "recall": float(hits[m].mean()) if m.sum() else np.nan,
                         "n_gt": int(m.sum())})
     return pd.DataFrame(out)
+
+
+# ----------------------------------------------------------------------------- anchor assignment statistics
+@torch.no_grad()
+def anchor_assignment_stats(mcfg: dict, index, n_images: int = 30, seed: int = 0,
+                            strides=(8, 16, 32, 64, 128), ignore_ioa: float = 0.5):
+    """RetinaNet-style assignment on real frames (CPU, no network): anchors per image, positives,
+    negatives, ignored (between thresholds) and negatives removed by the ignore regions.
+    Shows the foreground/background imbalance a one-stage detector faces without a proposal stage.
+    """
+    import pandas as pd
+    from torchvision.models.detection._utils import Matcher
+    from torchvision.models.detection.image_list import ImageList
+
+    from .anchors import input_scale
+    from .dataset import read_ignore, read_yolo_labels
+
+    sizes = [tuple(int(round(b * k)) for k in mcfg.get("anchor_scales", [1.0])) for b in mcfg["anchor_sizes"]]
+    ag = make_anchor_generator(sizes, mcfg["aspect_ratios"])
+    matcher = Matcher(mcfg["fg_iou_thresh"], mcfg["bg_iou_thresh"], allow_low_quality_matches=True)
+    rows = []
+    for r in index.sample(min(n_images, len(index)), random_state=seed).itertuples():
+        s = input_scale(r.width, r.height, mcfg["min_size_test"], mcfg["max_size"])
+        H, W = int(round(r.height * s)), int(round(r.width * s))
+        feats = [torch.zeros(1, 1, math.ceil(H / st), math.ceil(W / st)) for st in strides]
+        anchors = ag(ImageList(torch.zeros(1, 3, H, W), [(H, W)]), feats)[0]
+        gt = torch.from_numpy(read_yolo_labels(r.label_path, r.width, r.height)[0] * s)
+        ign = torch.from_numpy(read_ignore(r.ignore_path, r.width, r.height) * s)
+        if len(gt) == 0:
+            continue
+        m = matcher(box_iou(gt, anchors))
+        neg = m == Matcher.BELOW_LOW_THRESHOLD
+        neg_in_ignore = int((neg & (max_ioa(anchors, ign) > ignore_ioa)).sum()) if len(ign) else 0
+        pos = m >= 0
+        n_per_gt = torch.bincount(m[pos], minlength=len(gt))
+        rows.append({"anchors": len(anchors), "gt": len(gt), "positives": int(pos.sum()),
+                     "negatives": int(neg.sum()), "between": int((m == Matcher.BETWEEN_THRESHOLDS).sum()),
+                     "neg_in_ignore": neg_in_ignore, "neg_per_pos": float(neg.sum()) / max(int(pos.sum()), 1),
+                     "gt_with_1_anchor_%": float((n_per_gt <= 1).float().mean() * 100)})
+    return pd.DataFrame(rows).mean().round(1)

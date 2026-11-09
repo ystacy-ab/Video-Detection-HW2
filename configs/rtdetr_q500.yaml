@@ -1,0 +1,7 @@
+# Tuning 1: number of queries vs. scene density. Frames hold up to 180 objects (p99 142) and the
+# metric scores up to 500 detections; 300 queries also cap the number of boxes at 300.
+_base_: rtdetr_baseline.yaml
+experiment: rtdetr_q500
+
+model:
+  queries: 500

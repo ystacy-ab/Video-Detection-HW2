@@ -52,3 +52,32 @@ def anchors_to_sizes_ratios(centroids: np.ndarray):
     sizes = np.sqrt(centroids.prod(axis=1))
     ratios = centroids[:, 1] / centroids[:, 0]
     return sizes, ratios
+
+
+# ----------------------------------------------------------------------------- anchors vs. GT at network input
+def input_scale(width: int, height: int, min_size: int, max_size: int) -> float:
+    """Resize factor of torchvision's GeneralizedRCNNTransform (short side -> min_size, long <= max_size)."""
+    return min(min_size / min(width, height), max_size / max(width, height))
+
+
+def gt_wh_at_input(index, min_size: int, max_size: int, n: int = 800, seed: int = 0) -> np.ndarray:
+    """GT (w, h) of n random frames, rescaled to the network input."""
+    from .dataset import read_yolo_labels
+
+    whs = []
+    for r in index.sample(min(n, len(index)), random_state=seed).itertuples():
+        b, _ = read_yolo_labels(r.label_path, r.width, r.height)
+        whs.append((b[:, 2:] - b[:, :2]) * input_scale(r.width, r.height, min_size, max_size))
+    return np.concatenate(whs) if whs else np.zeros((0, 2))
+
+
+def anchor_wh(sizes, ratios, scales=(1.0,)) -> np.ndarray:
+    """All anchor shapes (w, h): torchvision AnchorGenerator convention h/w = ratio, area = size^2."""
+    return np.array([[s * k / np.sqrt(r), s * k * np.sqrt(r)] for s in sizes for k in scales for r in ratios])
+
+
+def anchor_coverage(wh: np.ndarray, anchors: np.ndarray) -> dict:
+    """Share of GT boxes whose best anchor shape (aligned centers) reaches IoU 0.5 / 0.7."""
+    best = wh_iou(wh, anchors).max(1)
+    return {"median_obj_px": float(np.median(np.sqrt(wh.prod(1)))),
+            "cover_IoU>=0.5": float((best >= 0.5).mean()), "cover_IoU>=0.7": float((best >= 0.7).mean())}

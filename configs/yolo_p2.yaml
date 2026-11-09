@@ -1,0 +1,10 @@
+# Tuning 2 (final anchor-free model): extra high-resolution P2 head (stride 4) on top of 1024 input.
+# Official yolov8-p2.yaml, matching layers initialised from yolov8s.pt.
+_base_: yolo_hires.yaml
+experiment: yolo_p2
+
+model:
+  cfg: yolov8s-p2.yaml
+
+train:
+  batch: 6

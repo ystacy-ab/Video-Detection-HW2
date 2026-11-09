@@ -197,3 +197,42 @@ def measure_speed(predict_fn, inputs: list, warmup: int = 10, iters: int = 100) 
     sync()
     ms = (time.perf_counter() - t0) / iters * 1000
     return {"ms_per_img": ms, "fps": 1000.0 / ms}
+
+
+# ----------------------------------------------------------------------------- grouped evaluation
+def evaluate_groups(preds: dict, gt_json: str | Path | dict, groups: dict, max_dets: int = 500):
+    """mAP / AP50 / AP_small on subsets of images. groups = {name: [image_key, ...]} -> DataFrame."""
+    import pandas as pd
+
+    gt = gt_json if isinstance(gt_json, dict) else json.load(open(gt_json))
+    rows = []
+    for name, keys in groups.items():
+        m = evaluate({k: preds[k] for k in keys if k in preds}, gt, max_dets=max_dets, img_keys=list(keys),
+                     verbose=False)
+        rows.append({"group": name, "n_images": len(keys), "mAP": m["mAP"], "AP50": m["AP50"],
+                     "AP_small": m["AP_small"]})
+    return pd.DataFrame(rows)
+
+
+def clip_groups(gt_json: str | Path | dict) -> dict:
+    """{clip: [image keys]} from the GT json (per-clip mAP shows how noisy a 7-clip val score is)."""
+    gt = gt_json if isinstance(gt_json, dict) else json.load(open(gt_json))
+    out = {}
+    for img in gt["images"]:
+        out.setdefault(Path(img["file_name"]).parent.name, []).append(key_from_path(img["file_name"]))
+    return out
+
+
+def density_groups(gt_json: str | Path | dict, bins=(0, 20, 50, 100, 10_000)) -> dict:
+    """{'0-19 obj': keys, ...}: images grouped by number of (non-ignore) GT objects (scene density)."""
+    gt = gt_json if isinstance(gt_json, dict) else json.load(open(gt_json))
+    counts = {img["id"]: 0 for img in gt["images"]}
+    for a in gt["annotations"]:
+        if not a.get("iscrowd", 0):
+            counts[a["image_id"]] += 1
+    id2key = {img["id"]: key_from_path(img["file_name"]) for img in gt["images"]}
+    out = {}
+    for lo, hi in zip(bins[:-1], bins[1:]):
+        name = f"{lo}-{hi - 1} obj" if hi < 10_000 else f">={lo} obj"
+        out[name] = [id2key[i] for i, n in counts.items() if lo <= n < hi]
+    return {k: v for k, v in out.items() if v}

@@ -1,7 +1,7 @@
 """Failure analysis on saved predictions (CPU only, works for every model's canonical preds).
 
 Matching is greedy by score at IoU >= iou_thr and CLASS-AGNOSTIC, so a car predicted as a van is a
-"wrong class" match (visible in the confusion matrix) instead of one FP + one FN. Detections that lie
+"wrong class" match (visible in the confusion matrix) instead of one FP + one FN. Detections
 that match no GT and lie mostly inside an ignore region are dropped (COCOeval ignores them too).
 This is a diagnostic in the spirit of Hoiem et al., "Diagnosing Error in Object Detectors", ECCV 2012
 and the TIDE toolbox (Bolya et al., ECCV 2020) - simplified to TP / FN / FP / wrong-class.

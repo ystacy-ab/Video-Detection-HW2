@@ -4,8 +4,11 @@ num_classes: 8
 class_names: [person, bicycle, car, van, truck, tricycle, bus, motor]
 
 data:
-  train_frame_step: 3      # keep every 3rd frame of each training clip (ablation: 1 vs 3)
-  val_frame_step: 1        # official validation always uses every frame
+  train_frame_step: 6      # SAME for every model: every 6th frame of each training clip (~4.0k frames).
+                           # Neighbouring frames are near-duplicates (25-30 fps video) and the GPU budget
+                           # is ~60 h for 4 detector families x 3-4 runs each.
+  val_frame_step: 1        # final validation score always uses every val frame
+  val_frame_step_epoch: 4  # per-epoch validation curves use every 4th val frame (~710 frames)
   ignore_fill: 114         # gray value painted over ignore regions (Ultralytics letterbox color)
   ignore_drop_ioa: 0.5     # drop GT boxes covered > 50% by ignore regions
   link_unmasked: true      # symlink frames without ignore regions instead of copying

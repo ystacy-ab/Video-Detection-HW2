@@ -1,0 +1,8 @@
+# Tuning 1: input resolution 640 -> 1024. At 640 a 1904x1071 frame shrinks x0.34, so the median 46 px
+# object becomes ~16 px and the 20 px objects (p5) ~7 px, i.e. less than one stride-8 cell.
+_base_: yolo_baseline.yaml
+experiment: yolo_hires
+
+train:
+  imgsz: 1024
+  batch: 8

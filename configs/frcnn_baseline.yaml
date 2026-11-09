@@ -31,17 +31,15 @@ ignore:
   ioa_thresh: 0.5                  # negative anchor / RoI with IoA > 0.5 inside an ignore box -> not sampled
 
 data:
-  train_frame_step: 6              # every 6th frame (~4.0k frames): T4 budget; base.yaml uses 3 for YOLO
-  val_frame_step_epoch: 4          # per-epoch val mAP on every 4th val frame (~710 frames)
   hflip: 0.5
 
 train:
-  epochs: 6
+  epochs: 4                        # same for every torchvision run (budget: ~25 min/epoch on T4 at 800/1333)
   batch_size: 2
   accum_steps: 2                   # effective batch 4
   num_workers: 4
   optimizer: sgd                   # sgd | adamw
-  lr: 0.01                         # for effective batch 4 (fine-tuning from COCO)
+  lr: 0.005                        # linear scaling rule: 0.02 for batch 16 (torchvision reference) x 4/16
   momentum: 0.9
   weight_decay: 1.0e-4
   schedule: cosine                 # cosine | step | onecycle

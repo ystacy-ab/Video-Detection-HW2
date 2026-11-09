@@ -1,0 +1,11 @@
+# Ablation 2 (two-stage specific): more proposals and more positive RoIs for dense scenes.
+# Frames hold 46 objects on average (up to 180) -> the default 1000 test proposals / 25 % positive RoIs
+# under-serve them.
+_base_: frcnn_baseline.yaml
+experiment: frcnn_sampler
+
+model:
+  rpn_pre_nms_top_n_test: 2000
+  rpn_post_nms_top_n_test: 2000    # number of RPN proposals passed to the box head at test time
+  rpn_batch_size_per_image: 512    # sampled anchors per image for the RPN loss
+  box_positive_fraction: 0.5       # RoI sampling ratio (positives among 512 sampled RoIs)

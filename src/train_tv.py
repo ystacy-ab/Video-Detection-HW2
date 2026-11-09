@@ -24,10 +24,10 @@ from tqdm.auto import tqdm
 
 from .dataset import (TVDetectionDataset, TVImageDataset, build_frame_index, collate_tv, load_rgb,
                       pre_resize, resolve_test_path)
-from .eval import evaluate, measure_speed, per_class_table
-from .models_tv import build_faster_rcnn, set_bn_eval, set_input_size, strip_ignore
+from .eval import clip_groups, evaluate, evaluate_groups, measure_speed, per_class_table
+from .models_tv import build_faster_rcnn, build_retinanet, set_bn_eval, set_input_size, strip_ignore
 from .submission import make_submission, validate_submission
-from .utils import (clip_dets, ensure_dir, init_wandb, log_experiment, save_predictions,
+from .utils import (clip_dets, ensure_dir, init_wandb, load_predictions, log_experiment, save_predictions,
                     seed_everything, topk_dets, wandb_log)
 
 
@@ -37,10 +37,12 @@ def get_device() -> torch.device:
 
 
 def build_model(cfg: dict):
-    """Dispatch on cfg['model']['arch'] (RetinaNet is added in the next stage)."""
+    """Dispatch on cfg['model']['arch']."""
     arch = cfg["model"]["arch"]
     if arch == "fasterrcnn_resnet50_fpn_v2":
         return build_faster_rcnn(cfg["model"], ignore_ioa=cfg["ignore"]["ioa_thresh"])
+    if arch == "retinanet_resnet50_fpn_v2":
+        return build_retinanet(cfg["model"], ignore_ioa=cfg["ignore"]["ioa_thresh"])
     raise ValueError(f"unknown arch {arch}")
 
 
@@ -114,6 +116,7 @@ def _to_canonical(out: dict, meta: dict, max_det: int) -> np.ndarray:
     scores = out["scores"].float().cpu().numpy()[:, None]
     cls = out["labels"].cpu().numpy()[:, None].astype(np.float32) - 1
     dets = np.concatenate([boxes, scores, cls], axis=1).astype(np.float32)
+    dets = dets[dets[:, 5] >= 0]  # RetinaNet has an (untrained) column for label 0 -> drop it
     H, W = meta["orig_size"]
     return topk_dets(clip_dets(dets, W, H), k=max_det)
 
@@ -301,10 +304,10 @@ def prepare_indices(cfg: dict, data_root, smoke: bool = False):
 def summarize_params(cfg: dict) -> dict:
     """The settings that differ between experiments (stored in experiments.csv)."""
     m, t = cfg["model"], cfg["train"]
-    keys_m = ["anchor_sizes", "aspect_ratios", "min_size_train", "min_size_test", "max_size",
-              "rpn_post_nms_top_n_train", "rpn_post_nms_top_n_test", "rpn_batch_size_per_image",
-              "box_batch_size_per_image", "box_positive_fraction", "box_loss"]
-    out = {k: m.get(k) for k in keys_m}
+    skip = {"arch", "weights", "box_score_thresh", "box_detections_per_img", "trainable_backbone_layers"}
+    if m["arch"].startswith("retinanet"):  # keys inherited from the Faster R-CNN config but unused here
+        skip |= {k for k in m if k.startswith(("rpn_", "box_batch", "box_positive", "box_loss", "giou"))}
+    out = {k: v for k, v in m.items() if k not in skip}
     out.update({"ignore": cfg["ignore"]["mode"], "frame_step": cfg["data"]["train_frame_step"],
                 "epochs": t["epochs"], "opt": t["optimizer"], "lr": t["lr"], "sched": t.get("schedule"),
                 "batch": t["batch_size"] * t.get("accum_steps", 1)})
@@ -323,7 +326,8 @@ def final_eval(model, cfg: dict, val_index: pd.DataFrame, gt_json, work_dir, exp
                           warmup=cfg["eval"]["speed_warmup"], iters=cfg["eval"]["speed_iters"])
     print(f"[final] {exp}: mAP={metrics['mAP']:.4f} | {speed['ms_per_img']:.1f} ms/img "
           f"({speed['fps']:.1f} FPS, batch 1, incl. JPEG decode) | preds -> {pred_path}")
-    return {"metrics": metrics, "speed": speed, "preds": preds, "per_class": per_class_table(metrics)}
+    return {"metrics": metrics, "speed": speed, "preds": preds, "per_class": per_class_table(metrics),
+            "per_clip": evaluate_groups(preds, gt_json, clip_groups(gt_json), cfg["eval"]["max_dets"])}
 
 
 def predict_test(model, cfg: dict, data_root, work_dir, exp: str, device) -> Path:
@@ -349,6 +353,18 @@ def run_experiment(cfg: dict, data_root, work_dir, smoke: bool = False, test: bo
     seed_everything(cfg["seed"])
     device = get_device()
     gt_json = Path(data_root) / "val" / "annotations_coco.json"
+    work_dir = Path(work_dir)
+    done_file = work_dir / "tv" / exp / "final.json"
+    if done_file.exists() and not smoke:  # finished earlier (e.g. before a disconnect): reuse, do not re-log
+        info = json.loads(done_file.read_text())
+        preds = load_predictions(work_dir / "preds" / f"{exp}_val.pkl")
+        res = {"metrics": info["metrics"], "speed": info["speed"], "preds": preds, "model": None, "exp": exp,
+               "per_class": per_class_table(info["metrics"]), "state": info["state"],
+               "per_clip": evaluate_groups(preds, gt_json, clip_groups(gt_json), cfg["eval"]["max_dets"])}
+        print(f"[run] {exp} already finished: mAP={info['metrics']['mAP']:.4f} (from {done_file})")
+        if test and not (work_dir / "submissions" / f"{exp}.csv").exists():
+            res["submission"] = predict_test(load_trained(cfg, work_dir, device), cfg, data_root, work_dir, exp, device)
+        return res
     if smoke:
         cfg = json.loads(json.dumps(cfg))  # deep copy
         cfg["train"].update(epochs=1, max_iters_per_epoch=40, warmup_iters=10)
@@ -362,6 +378,8 @@ def run_experiment(cfg: dict, data_root, work_dir, smoke: bool = False, test: bo
     if not smoke:
         log_experiment(exp, cfg["model"]["arch"], summarize_params(cfg), res["metrics"], res["speed"],
                        train_time_min=state["train_time_min"], notes=notes)
+        done_file.write_text(json.dumps({"metrics": res["metrics"], "speed": res["speed"], "state": state},
+                                        default=float))
         if test:
             res["submission"] = predict_test(model, cfg, data_root, work_dir, exp, device)
     if run is not None:

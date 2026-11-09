@@ -1,0 +1,5 @@
+,anchors,gt,positives,negatives,between,neg_in_ignore,neg_per_pos,gt_with_1_anchor_%
+retinanet_baseline,188748.0,37.3,704.9,186774.7,1268.4,1664.3,532.5,5.1
+retinanet_anchors,188748.0,37.3,266.6,187980.2,501.1,1932.1,1400.3,11.4
+retinanet_assign,188748.0,37.3,767.8,186743.7,1236.5,1923.2,493.3,5.5
+retinanet_tuned,349992.0,37.3,738.7,348010.3,1243.0,3350.2,741.7,2.6

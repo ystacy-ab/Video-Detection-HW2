@@ -1,0 +1,8 @@
+# Ablation 1: anchors grounded in the EDA object sizes.
+# k-means (k=9) sizes 17..138 px, p5 = 20 px; at 800/1333 objects shrink x0.5-0.7 -> the default
+# smallest anchor (32 px at P3) matches few small objects with IoU >= 0.5. Base sizes halved.
+_base_: retinanet_baseline.yaml
+experiment: retinanet_anchors
+
+model:
+  anchor_sizes: [16, 32, 64, 128, 256]

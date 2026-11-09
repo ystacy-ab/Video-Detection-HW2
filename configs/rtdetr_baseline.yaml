@@ -1,0 +1,17 @@
+# Query-based baseline: RT-DETR-L (Ultralytics), COCO weights, 300 queries, 640 input.
+# Same frames / val / metric as all other models. Budget: see the time estimates in 05_rtdetr.ipynb.
+_base_: yolo_baseline.yaml
+experiment: rtdetr_baseline
+
+model:
+  arch: rtdetr
+  weights: rtdetr-l.pt
+  cfg: null
+  queries: 300
+
+train:
+  epochs: 12
+  imgsz: 640
+  batch: 8
+  close_mosaic: 3
+  deterministic: false     # deformable attention (grid_sample) has no deterministic CUDA backward

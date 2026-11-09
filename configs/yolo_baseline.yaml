@@ -1,0 +1,29 @@
+# One-stage anchor-free baseline: YOLOv8s (Ultralytics), COCO weights, default hyper-parameters.
+# Same frames (step 6), same val split and the same src.eval metric as the torchvision models.
+# Ignore regions: painted gray (src/convert.py), because Ultralytics has no ignore concept in its loss.
+_base_: base.yaml
+experiment: yolo_baseline
+
+model:
+  arch: yolo
+  weights: yolov8s.pt      # downloaded to WORK_DIR/weights
+  cfg: null                # optional architecture yaml (weights are then transferred from `weights`)
+
+predict:                   # final evaluation / test predictions
+  conf: 0.001
+  iou: 0.7                 # NMS IoU (Ultralytics default)
+  max_det: 500
+  batch: 16
+
+train:                     # passed verbatim to ultralytics model.train(...)
+  epochs: 20
+  imgsz: 640
+  batch: 16
+  workers: 4
+  optimizer: auto
+  cos_lr: true
+  close_mosaic: 5          # last 5 epochs without mosaic
+  patience: 100            # no early stopping (fixed budget)
+  amp: true
+  plots: false
+  deterministic: true

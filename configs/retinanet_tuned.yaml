@@ -1,0 +1,9 @@
+# Final one-stage anchor-based model: small anchors + lower IoU thresholds + higher input resolution
+# (same resolution as frcnn_tuned so the two tuned anchor-based models are directly comparable).
+_base_: retinanet_assign.yaml
+experiment: retinanet_tuned
+
+model:
+  min_size_train: [896, 960, 1024, 1088]
+  min_size_test: 1024
+  max_size: 1824

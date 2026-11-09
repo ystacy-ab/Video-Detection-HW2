@@ -1,0 +1,7 @@
+# Tuning 2 (final query-based model): 500 queries + input resolution 640 -> 960 (small objects).
+_base_: rtdetr_q500.yaml
+experiment: rtdetr_tuned
+
+train:
+  imgsz: 960
+  batch: 4
