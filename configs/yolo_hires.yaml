@@ -6,3 +6,6 @@ experiment: yolo_hires
 train:
   imgsz: 1024
   batch: 8
+
+predict:
+  batch: 4                 # 1024 input: smaller inference batches (T4 16 GB)

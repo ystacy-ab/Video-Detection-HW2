@@ -87,6 +87,16 @@ def build_ul_model(cfg: dict, work_dir):
     return model
 
 
+def free_gpu() -> None:
+    import gc
+
+    import torch
+
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def load_ul(path, arch: str):
     ul = _ul()
     return (ul.RTDETR if arch == "rtdetr" else ul.YOLO)(str(path))
@@ -142,16 +152,21 @@ def _canonical(res, max_det: int) -> np.ndarray:
 
 
 def predict_ul(model, keys: list[str], paths: list[str], pcfg: dict, imgsz: int, augment: bool = False,
-               chunk: int = 256, desc: str = "predict") -> dict:
-    """Predict image paths -> {key: (N,6) canonical} in original pixels (Ultralytics rescales boxes)."""
+               desc: str = "predict") -> dict:
+    """Predict image paths -> {key: (N,6) canonical} in original pixels (Ultralytics rescales boxes).
+
+    Ultralytics runs a whole list source as ONE batch (its `batch` argument is ignored for lists),
+    so the list is split here into chunks of pcfg['batch'] images.
+    """
     import torch
 
     half = torch.cuda.is_available()
+    chunk = int(pcfg.get("batch", 8))
     preds = {}
     for s in tqdm(range(0, len(paths), chunk), desc=desc, leave=False):
         res = model.predict(source=list(map(str, paths[s:s + chunk])), imgsz=imgsz, conf=pcfg["conf"],
-                            iou=pcfg["iou"], max_det=pcfg["max_det"], batch=pcfg.get("batch", 16), half=half,
-                            augment=augment, verbose=False, stream=True)
+                            iou=pcfg["iou"], max_det=pcfg["max_det"], half=half, augment=augment,
+                            verbose=False, stream=True)
         for k, r in zip(keys[s:s + chunk], res):
             preds[k] = _canonical(r, pcfg["max_det"])
     return preds
@@ -260,6 +275,7 @@ def run_ul_experiment(cfg: dict, data_yaml, data_root, work_dir, smoke: bool = F
         print(f"[run] {exp} already finished: mAP={info['metrics']['mAP']:.4f} (from {done_file})")
     else:
         train_ul(cfg, data_yaml, work_dir, exp, smoke)
+        free_gpu()  # the trainer keeps GPU memory -> release it before predicting 2846 frames
         model = load_ul(run_dir / "weights" / "last.pt", arch)
         _, _, val_full = prepare_indices(cfg, data_root, smoke)
         preds = predict_ul(model, val_full["key"].tolist(), val_full["img_path"].tolist(), pcfg, imgsz,

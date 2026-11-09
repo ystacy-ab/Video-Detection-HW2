@@ -5,3 +5,6 @@ experiment: rtdetr_tuned
 train:
   imgsz: 960
   batch: 4
+
+predict:
+  batch: 4
