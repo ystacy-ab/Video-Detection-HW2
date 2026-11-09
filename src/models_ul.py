@@ -33,8 +33,8 @@ def _ul():
     import ultralytics
     from ultralytics import settings
 
-    settings.update({"wandb": False, "hub": False, "mlflow": False, "clearml": False, "comet": False,
-                     "dvc": False, "neptune": False, "raytune": False, "tensorboard": False})
+    off = ["wandb", "hub", "mlflow", "clearml", "comet", "dvc", "neptune", "raytune", "tensorboard"]
+    settings.update({k: False for k in off if k in settings})  # keys differ between Ultralytics versions
     return ultralytics
 
 
